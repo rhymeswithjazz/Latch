@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Latch</string>
+	<key>CFBundleExecutable</key>
+	<string>Latch</string>
+	<key>CFBundleIconFile</key>
+	<string>Latch</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.rhymeswithjazz.Unlocker</string>
+	<key>CFBundleName</key>
+	<string>Latch</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Latch reads your selected Apple Watch signal to detect when you walk away from this Mac.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>UnlockerDiagnosticOnly</key>
+	<false/>
+	<key>LatchUpdatesEnabled</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://rhymeswithjazz.github.io/Latch/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MS6Pbv9PxYYxndOuIi2Va14wiTaTJH5ahSwHHQnNQSg=</string>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUSendProfileInfo</key>
+	<false/>
+</dict>
+</plist>

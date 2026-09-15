@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  release-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 -m unittest discover -s scripts/tests
+  macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: ./scripts/test.sh
+      - run: ./scripts/build.sh --universal
+      - name: Verify portable bundle
+        run: |
+          codesign --verify --deep --strict build/Latch.app
+          lipo build/Latch.app/Contents/MacOS/Latch -verify_arch arm64 x86_64
+          ditto -c -k --sequesterRsrc --keepParent build/Latch.app build/Latch-development.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Latch-development
+          path: build/Latch-development.zip

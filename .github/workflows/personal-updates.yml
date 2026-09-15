@@ -1,0 +1,35 @@
+name: Personal update feed
+on:
+  release:
+    types: [published, edited, unpublished, deleted]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: personal-update-feed
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'rhymeswithjazz/Latch' && (github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'personal-'))
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Test release tooling
+        run: python3 -m unittest discover -s scripts/tests
+      - name: Assemble published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/personal_appcast.py build/update-site/appcast.xml
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/update-site
+      - uses: actions/deploy-pages@v4
+        id: deployment
