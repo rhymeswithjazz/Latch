@@ -23,7 +23,7 @@ jobs:
       - name: Verify portable bundle
         run: |
           codesign --verify --deep --strict build/Latch.app
-          lipo build/Latch.app/Contents/MacOS/Latch -verify_arch arm64 x86_64
+          python3 -c 'import subprocess; assert set(subprocess.check_output(["lipo", "-archs", "build/Latch.app/Contents/MacOS/Latch"], text=True).split()) == {"arm64", "x86_64"}' 
           ditto -c -k --sequesterRsrc --keepParent build/Latch.app build/Latch-development.zip
       - uses: actions/upload-artifact@v4
         with:
