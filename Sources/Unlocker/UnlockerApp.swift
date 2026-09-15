@@ -153,7 +153,7 @@ private struct DiagnosticsView: View {
                     .foregroundStyle(.secondary)
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Automatically lock when I walk away", isOn: Binding(get: { model.automaticLocking }, set: model.setAutomaticLocking))
+                        Toggle("Automatically lock when I walk away", isOn: Binding(get: { model.automaticLocking }, set: { model.setAutomaticLocking($0) }))
                             .disabled(!model.automaticLocking && !model.canEnableAutomaticLocking)
                         Text(model.status).font(.headline)
                         Text("\(model.selectedName) · \(model.signal)")
@@ -240,10 +240,10 @@ private struct DiagnosticsView: View {
                     }
                 }
                 Divider()
-                Toggle("Launch at login", isOn: Binding(get: { model.loginEnabled }, set: model.setLogin))
+                Toggle("Launch at login", isOn: Binding(get: { model.loginEnabled }, set: { model.setLogin($0) }))
                 if updater.isEnabled {
                     Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheckForUpdates)
-                    Toggle("Automatically check for updates", isOn: Binding(get: { updater.automaticallyChecksForUpdates }, set: updater.setAutomaticallyChecks))
+                    Toggle("Automatically check for updates", isOn: Binding(get: { updater.automaticallyChecksForUpdates }, set: { updater.setAutomaticallyChecks($0) }))
                     Toggle("Include test builds", isOn: $updater.includeTestBuilds)
                 } else {
                     Text("Updates are disabled in development builds.").font(.caption).foregroundStyle(.secondary)
