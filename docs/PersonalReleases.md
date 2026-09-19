@@ -32,6 +32,14 @@ python3 scripts/personal_release.py preflight
 
 Preflight checks the Developer ID identity, update key, notarization credentials, and public GitHub repository. Keychain may ask for access when Apple's signing tools or Sparkle first use a key.
 
+## Version numbers
+
+Use `MAJOR.MINOR.PATCH` for the public version. While Latch is before 1.0, bump the minor number for new features and the patch number for fixes. Reset the patch to zero when the minor changes. Reserve 1.0.0 for the first release we consider ready for everyday use. After 1.0, bump the major number for breaking changes, the minor for compatible features, and the patch for fixes.
+
+The signal-level settings release is **0.2.0, build 9**. Keep `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` in sync with each release. Pass the same values to the packaging command.
+
+Build numbers are separate, increasing integers shared by stable and beta releases. Choose a number above every existing release, draft, tag, and packaged build. Never reuse a build number or overwrite a release artifact. Keep `personal-BUILD` tags for compatibility with the update feed; GitHub release titles and the app show the public version. Beta packages use `--beta` and Sparkle's beta channel, with their own build numbers.
+
 ## Package a release
 
 Commit the source first. The first Sparkle distribution build is `8`; builds `1` through `7` belong to the prototypes. Increase build numbers across both stable and beta releases. Use a three-part marketing version such as `0.1.0`.

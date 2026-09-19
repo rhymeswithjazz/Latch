@@ -14,20 +14,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         updater.start()
         installStatusItem()
-        showDiagnostics()
+        showSettings()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showDiagnostics()
+        showSettings()
         return true
     }
 
-    @objc func showDiagnostics() {
+    @objc func showSettings() {
         if windowController == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: DiagnosticsView(model: model, updater: updater)))
-            window.title = "Latch Diagnostics"
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model, updater: updater)))
+            window.title = "Latch Settings"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 650, height: 680))
             window.contentMinSize = NSSize(width: 600, height: 560)
@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        addItem("Open Diagnostics…", action: #selector(showDiagnostics), to: menu)
+        addItem("Settings…", action: #selector(showSettings), to: menu)
         addItem(model.paused ? "Resume Monitoring" : "Pause Monitoring", action: #selector(togglePaused), to: menu)
         addItem(model.automaticLocking ? "Turn Off Automatic Locking" : "Turn On Automatic Locking", action: #selector(toggleAutomaticLocking), enabled: model.automaticLocking || model.canEnableAutomaticLocking, to: menu)
         addItem("Lock Now", action: #selector(lockNow), enabled: model.canLock, to: menu)
@@ -127,13 +127,13 @@ struct UnlockerApp: App {
         }
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Open Diagnostics…", action: delegate.showDiagnostics).keyboardShortcut(",")
+                Button("Settings…", action: delegate.showSettings).keyboardShortcut(",")
             }
         }
     }
 }
 
-private struct DiagnosticsView: View {
+private struct SettingsView: View {
     @Bindable var model: AppModel
     @ObservedObject var updater: SoftwareUpdater
     @State private var deviceSearch = ""
@@ -218,16 +218,11 @@ private struct DiagnosticsView: View {
                 }
                 }
                 CalibrationView(model: model)
+                SignalSettingsView(model: model)
                 SignalHistoryView(model: model)
                 Divider()
                 DisclosureGroup("Advanced settings") {
                     VStack(alignment: .leading, spacing: 10) {
-                    Text("Compare readings at your desk and at the departure point. Raise the threshold to lock sooner. Signal strength does not map to a fixed distance.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Text("Lock below \(Int(model.threshold)) dBm").frame(width: 180, alignment: .leading)
-                        Slider(value: $model.threshold, in: -100 ... -20, step: 1)
-                    }
                     Stepper("Weak signal delay: \(Int(model.weakDelay)) seconds", value: $model.weakDelay, in: 1 ... 60)
                     Stepper("Missing signal delay: \(Int(model.missingDelay)) seconds", value: $model.missingDelay, in: 5 ... 300, step: 5)
                     Toggle("Passive scanning", isOn: $model.passive)

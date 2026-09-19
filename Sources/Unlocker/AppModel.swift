@@ -211,16 +211,37 @@ final class AppModel {
         tick()
     }
 
+    var canAdjustSignal: Bool {
+        guard canSelect, selectedID != nil, monitor.state != .verifyingLock else { return false }
+        switch calibration.phase {
+        case .desk, .ready, .walking: return false
+        default: return true
+        }
+    }
+
+    func applySignalLevel() {
+        guard canAdjustSignal else { return }
+        var next = configuration
+        next.settings.threshold = threshold
+        guard next.settings.isValid else { error = "Choose a signal level between -100 and -20 dBm."; return }
+        guard save(next) else { return }
+        interruptCalibration("Signal level changed.")
+        monitor.configure(settings: next.settings, selected: true, lockAvailable: locker.isAvailable)
+        previewEvents = []
+        record("signalLevelChanged", ["threshold": String(threshold)])
+        tick()
+    }
+
     func applySettings() {
         var next = configuration
-        next.settings = MonitorSettings(threshold: threshold, weakSignalDelay: weakDelay,
+        next.settings = MonitorSettings(threshold: configuration.settings.threshold, weakSignalDelay: weakDelay,
                                         missingSignalDelay: missingDelay, passive: passive)
         guard next.settings.isValid else { error = "Enter valid thresholds and delays."; return }
         guard save(next) else { return }
         interruptCalibration("Settings changed. Start a new calibration to use these settings.")
         monitor.configure(settings: next.settings, selected: selectedID != nil, lockAvailable: locker.isAvailable)
         bluetooth.select(selectedID, passive: passive)
-        record("settings", ["threshold": String(threshold), "weakDelay": String(weakDelay),
+        record("settings", ["threshold": String(next.settings.threshold), "weakDelay": String(weakDelay),
                             "missingDelay": String(missingDelay), "passive": String(passive)])
         tick()
     }

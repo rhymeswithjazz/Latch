@@ -83,6 +83,36 @@ struct CalibrationView: View {
     }
 }
 
+struct SignalSettingsView: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Lock signal level").font(.headline)
+                Text("Adjust this anytime after your signal test. A higher level, such as -60 instead of -75 dBm, locks sooner. A lower level lets you move farther away. Signal strength does not map to a fixed distance.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Lock below \(Int(model.threshold)) dBm")
+                        .monospacedDigit().frame(width: 180, alignment: .leading)
+                    Slider(value: $model.threshold, in: -100 ... -20, step: 1)
+                        .accessibilityLabel("Lock signal level")
+                        .accessibilityValue("\(Int(model.threshold)) dBm")
+                }
+                .disabled(!model.canAdjustSignal)
+                HStack {
+                    Button("Save signal level") { model.applySignalLevel() }
+                        .disabled(!model.canAdjustSignal || model.threshold == model.configuration.settings.threshold)
+                    Text("Saved: \(Int(model.configuration.settings.threshold)) dBm")
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                Text("Saving applies the level to the current mode and keeps your delays. To check it with lock previews, turn off automatic locking and try another walk.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
+        }
+    }
+}
+
 struct SignalHistoryView: View {
     @Bindable var model: AppModel
 
@@ -131,7 +161,7 @@ struct SignalHistoryView: View {
                     Text(event.date, style: .time).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
-            Text("Recent history is kept while Latch is open. Saving a suggested setting clears earlier preview events so you can test it afresh.")
+            Text("Recent history is kept while Latch is open. Saving a signal level clears earlier preview events so you can test it afresh.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

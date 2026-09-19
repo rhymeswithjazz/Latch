@@ -14,7 +14,7 @@ Requires macOS 26+, Xcode with Swift 6.2+, and Python 3.11+. Sparkle 2.9.5 is pi
 open build/Latch.app
 ```
 
-Open Diagnostics from the lock icon in the menu bar. Click Scan, grant Bluetooth access, and select your Watch by comparing its signal as you move it. Device names are hints, not proof of ownership. Use the same Apple Account on the Mac and Watch; stable identity remains a hardware acceptance requirement.
+Open Settings from the latch icon in the menu bar. Click Scan, grant Bluetooth access, and select your Watch by comparing its signal as you move it. Device names are hints, not proof of ownership. Use the same Apple Account on the Mac and Watch; stable identity remains a hardware acceptance requirement.
 
 ### Guided calibration
 
@@ -25,7 +25,7 @@ Open Diagnostics from the lock icon in the menu bar. Click Scan, grant Bluetooth
 5. Click **Use this setting** to save it. Your existing delays remain unchanged.
 6. Wait for **Observing proximity**, then repeat your walk. The in-app **Lock previews** list shows whether and when Latch would have locked. The signal chart shows your saved threshold and preview event markers.
 
-Unstable, missing, or overlapping readings produce a retry explanation without applying a recommendation. Pausing, changing the Watch or settings, locking, or sleeping interrupts calibration. Manual thresholds, delays, passive mode, and Lock Now are under **Advanced settings**. Starting calibration turns automatic locking off. Turn it back on after testing your saved setting.
+Unstable, missing, or overlapping readings produce a retry explanation without applying a recommendation. Pausing, changing the Watch or settings, locking, or sleeping interrupts calibration. Adjust the threshold under **Lock signal level** and click **Save signal level**. The saved level applies to the current mode and persists between launches without changing your delays. Delays, passive mode, and Lock Now are under **Advanced settings**. Starting calibration turns automatic locking off. Turn it back on after testing your saved setting.
 
 Passive mode listens for advertisements instead of maintaining a connection. Use it to compare radio reliability or investigate interference with headphones, keyboards, mice, or Personal Hotspot. Missing signals after monitoring is armed trigger a lock, or a preview when automatic locking is off, even if Bluetooth turns off. Pause suspends observation; resume, unlock, and wake require a fresh nearby reading.
 
