@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import UnlockerCore
 
-private func ready(diagnostic: Bool = true) -> ProximityMonitor {
+private func ready(diagnostic: Bool = true, action: DepartureAction = .lockScreen) -> ProximityMonitor {
     var monitor = ProximityMonitor(diagnosticOnly: diagnostic)
-    monitor.configure(settings: .init(), selected: true, lockAvailable: true)
+    monitor.configure(settings: .init(), selected: true, lockAvailable: true, departureAction: action)
     _ = monitor.updateSession(.unlocked)
     return monitor
 }
@@ -90,7 +90,7 @@ private func ready(diagnostic: Bool = true) -> ProximityMonitor {
     #expect(monitor.state == .waitingForNearby)
 }
 
-@Test(arguments: [SessionState.asleep, .locked, .inactive, .unknown])
+@Test(arguments: [SessionState.asleep, .locked, .screenSaver, .inactive, .unknown])
 func sessionChangesDiscardStaleReadings(state: SessionState) {
     var monitor = ready()
     monitor.receive(rssi: -50, at: 0)
@@ -211,4 +211,64 @@ func sessionChangesDiscardStaleReadings(state: SessionState) {
     #expect(try !SavedConfiguration.decode(JSONSerialization.data(withJSONObject: legacy)).automaticLocking)
     configuration.automaticLocking = true
     #expect(try SavedConfiguration.decode(JSONEncoder().encode(configuration)) == configuration)
+}
+
+@Test func oldSettingsKeepLockScreenAndScreenSaverChoicePersists() throws {
+    var configuration = SavedConfiguration(deviceID: UUID(), deviceName: "Watch")
+    let data = try JSONEncoder().encode(configuration)
+    var legacy = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacy.removeValue(forKey: "departureAction")
+    #expect(try SavedConfiguration.decode(JSONSerialization.data(withJSONObject: legacy)).departureAction == .lockScreen)
+    configuration.departureAction = .startScreenSaver
+    configuration.automaticLocking = true
+    #expect(try SavedConfiguration.decode(JSONEncoder().encode(configuration)) == configuration)
+}
+
+@Test func screenSaverRequiresItsOwnConfirmationAndFreshSignalAfterDismissal() {
+    var monitor = ready(diagnostic: false, action: .startScreenSaver)
+    monitor.receive(rssi: -50, at: 0)
+    #expect(monitor.tick(at: 30) == [.requestLock(.missingSignal)])
+    #expect(monitor.tick(at: 33).isEmpty)
+    #expect(monitor.updateSession(.locked).isEmpty)
+    #expect(monitor.updateSession(.screenSaver) == [.lockConfirmed])
+    #expect(monitor.tick(at: 100).isEmpty)
+    #expect(monitor.state == .suspended)
+    _ = monitor.updateSession(.unlocked)
+    monitor.receive(rssi: -90, at: 101)
+    #expect(monitor.tick(at: 200).isEmpty)
+    monitor.receive(rssi: -50, at: 201)
+    #expect(monitor.tick(at: 231) == [.requestLock(.missingSignal)])
+}
+
+@Test func screenSaverDoesNotConfirmALockRequest() {
+    var monitor = ready(diagnostic: false)
+    #expect(monitor.manualLock(at: 0) == [.requestLock(.manual)])
+    #expect(monitor.updateSession(.screenSaver).isEmpty)
+    #expect(monitor.tick(at: 3) == [.lockFailed])
+}
+
+@Test func screenSaverPreviewAndManualRetry() {
+    var monitor = ready(action: .startScreenSaver)
+    monitor.receive(rssi: -50, at: 0)
+    #expect(monitor.tick(at: 30) == [.proposeLock(.missingSignal)])
+    #expect(monitor.manualLock(at: 31) == [.requestLock(.manual)])
+    #expect(monitor.tick(at: 41) == [.lockFailed])
+    #expect(monitor.state == .fault("Screen saver start was not confirmed. Retry Start Screen Saver Now."))
+    #expect(monitor.manualLock(at: 42) == [.requestLock(.manual)])
+    #expect(monitor.lockInvocationFailed() == [.lockFailed])
+    #expect(monitor.state == .fault("The screen saver could not start. Monitoring is stopped."))
+    #expect(monitor.manualLock(at: 43) == [.requestLock(.manual)])
+    #expect(monitor.updateSession(.screenSaver) == [.lockConfirmed])
+    #expect(monitor.lockInvocationFailed().isEmpty)
+}
+
+@Test func changingDepartureActionDiscardsOldReadings() {
+    var monitor = ready(diagnostic: false)
+    monitor.receive(rssi: -50, at: 0)
+    monitor.configure(settings: .init(), selected: true, lockAvailable: true, departureAction: .startScreenSaver)
+    #expect(monitor.tick(at: 100).isEmpty)
+    monitor.receive(rssi: -90, at: 101)
+    #expect(monitor.tick(at: 200).isEmpty)
+    monitor.receive(rssi: -50, at: 201)
+    #expect(monitor.tick(at: 231) == [.requestLock(.missingSignal)])
 }

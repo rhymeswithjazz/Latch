@@ -9,9 +9,12 @@ import UnlockerCore
     #expect(SessionMonitor.decode([:]) == .inactive)
     let active: [String: Any] = [kCGSessionOnConsoleKey as String: true, kCGSessionLoginDoneKey as String: true]
     #expect(SessionMonitor.decode(active) == .unlocked)
+    #expect(SessionMonitor.decode(active, screenSaverRunning: true) == .screenSaver)
+    #expect(SessionMonitor.decode(nil, screenSaverRunning: true) == .unknown)
     var locked = active
     locked["CGSSessionScreenIsLocked"] = true
     #expect(SessionMonitor.decode(locked) == .locked)
+    #expect(SessionMonitor.decode(locked, screenSaverRunning: true) == .locked)
 }
 
 @Test @MainActor func localStorePreservesUnreadableSettings() throws {

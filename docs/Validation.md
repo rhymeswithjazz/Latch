@@ -77,3 +77,10 @@ Launched the signed build and verified that the enabled automatic-locking contro
 Added Sparkle 2.9.5, an independent Latch update key, fixed feed URL, update settings, and local release packaging adapted from HighDock. Existing bundle identity and settings storage stay unchanged. GitHub Actions runs tests, builds a universal development ZIP, and deploys the feed from published personal releases.
 
 Local validation passes 34 Swift tests and 25 Python tests. The update flow between two installed versions still needs a second-Mac test.
+
+
+## Screen saver action
+
+Added a saved choice between Lock Screen and Start Screen Saver. Older settings keep Lock Screen. The settings window, menu command, calibration copy, and previews follow the selected action. Starting the saver uses the system ScreenSaverEngine app. Its start notification confirms the request, and monitoring stays suspended while it runs. Password timing follows macOS settings.
+
+All 39 Swift tests and 25 Python release tests pass. The universal development app builds for arm64 and x86_64. New checks cover settings migration and persistence, action changes discarding old readings, distinct lock and screen saver confirmations, confirmation timeout and retry, and fresh-signal requirements after dismissal. Actual screen saver launch, start/stop notification delivery, and password timing still need a manual check on supported macOS versions.

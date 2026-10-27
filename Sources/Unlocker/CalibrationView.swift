@@ -8,10 +8,10 @@ struct CalibrationView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Find your lock setting").font(.title2.bold())
+                Text("Find your walk-away setting").font(.title2.bold())
                 switch model.calibration.phase {
                 case .idle:
-                    Text("We’ll measure your Watch at your desk, then while you walk away and return. Starting a test turns automatic locking off. Turn it back on when you finish.")
+                    Text("We’ll measure your Watch at your desk, then while you walk away and return. Starting a test turns the automatic walk-away action off. Turn it back on when you finish.")
                     Text("1. Sit at your laptop with your Watch on.\n2. Record your desk signal for 10 seconds.\n3. Walk to your chosen spot, stay 15 seconds, then return.")
                         .foregroundStyle(.secondary)
                     Button("Record my desk signal") { model.startCalibration() }
@@ -27,7 +27,7 @@ struct CalibrationView: View {
                     Button("Cancel test") { model.cancelCalibration() }
                 case .ready:
                     Text("Step 2 · Take a short walk").font(.headline)
-                    Text("Your desk signal is recorded. Click below, walk to the spot where you want the Mac to lock, and stay there for 15 seconds. Then come back and click “I’m back.”")
+                    Text("Your desk signal is recorded. Click below, walk to the spot where you want Latch to \(model.actionVerb), and stay there for 15 seconds. Then come back and click “I’m back.”")
                     Text("You don’t need to read the screen while you’re away. Finish within two minutes.")
                         .foregroundStyle(.secondary)
                     HStack {
@@ -53,7 +53,7 @@ struct CalibrationView: View {
                         measurement("Suggested threshold", result.threshold)
                     }
                     if model.calibrationSaved {
-                        Text("Wait for “Observing proximity,” then walk away once more and return. The event list below will show when Latch would have locked. When you are happy with the result, turn on “Automatically lock when I walk away” above.")
+                        Text("Wait for “Observing proximity,” then walk away once more and return. The event list below will show when Latch would \(model.actionVerb). When you are happy with the result, turn on “\(model.automaticToggleTitle)” above.")
                     } else {
                         Text("This setting falls between your desk signal and the sustained weaker part of your walk. Save it, then repeat the walk to check the result.")
                         Text("Saving keeps your current delays: \(Int(model.configuration.settings.weakSignalDelay)) seconds for weak signal and \(Int(model.configuration.settings.missingSignalDelay)) seconds for missing signal.")
@@ -89,14 +89,14 @@ struct SignalSettingsView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Lock signal level").font(.headline)
-                Text("Adjust this anytime after your signal test. A higher level, such as -60 instead of -75 dBm, locks sooner. A lower level lets you move farther away. Signal strength does not map to a fixed distance.")
+                Text("Walk-away signal level").font(.headline)
+                Text("Adjust this anytime after your signal test. A higher level, such as -60 instead of -75 dBm, triggers sooner. A lower level lets you move farther away. Signal strength does not map to a fixed distance.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Text("Lock below \(Int(model.threshold)) dBm")
+                    Text("Trigger below \(Int(model.threshold)) dBm")
                         .monospacedDigit().frame(width: 180, alignment: .leading)
                     Slider(value: $model.threshold, in: -100 ... -20, step: 1)
-                        .accessibilityLabel("Lock signal level")
+                        .accessibilityLabel("Walk-away signal level")
                         .accessibilityValue("\(Int(model.threshold)) dBm")
                 }
                 .disabled(!model.canAdjustSignal)
@@ -106,7 +106,7 @@ struct SignalSettingsView: View {
                     Text("Saved: \(Int(model.configuration.settings.threshold)) dBm")
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
-                Text("Saving applies the level to the current mode and keeps your delays. To check it with lock previews, turn off automatic locking and try another walk.")
+                Text("Saving applies the level to the current mode and keeps your delays. To check it with action previews, turn off the automatic walk-away action and try another walk.")
                     .font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }
@@ -121,7 +121,7 @@ struct SignalHistoryView: View {
             Text("Signal history").font(.headline)
             if model.history.isEmpty {
                 ContentUnavailableView("Waiting for Watch readings", systemImage: "waveform.path",
-                                       description: Text("Your signal and lock previews will appear here."))
+                                       description: Text("Your signal and action previews will appear here."))
                     .frame(height: 150)
             } else {
                 Chart {
@@ -133,7 +133,7 @@ struct SignalHistoryView: View {
                     RuleMark(y: .value("Saved threshold", model.configuration.settings.threshold))
                         .foregroundStyle(.orange).lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
                     ForEach(model.previewEvents.filter { $0.date >= model.historyNow.addingTimeInterval(-180) }) { event in
-                        RuleMark(x: .value("Would lock", event.date))
+                        RuleMark(x: .value("Action preview", event.date))
                             .foregroundStyle(.orange.opacity(0.6))
                     }
                 }
@@ -146,16 +146,16 @@ struct SignalHistoryView: View {
                 .frame(height: 150)
                 .accessibilityLabel("Recent Watch signal. Saved threshold \(Int(model.configuration.settings.threshold)) decibels.")
             }
-            Text("Higher means a stronger signal. The dashed line is your saved setting. Orange vertical lines mark lock previews. Gaps mean no fresh readings.")
+            Text("Higher means a stronger signal. The dashed line is your saved setting. Orange vertical lines mark action previews. Gaps mean no fresh readings.")
                 .font(.caption).foregroundStyle(.secondary)
-            Text("Lock previews").font(.headline)
+            Text("Action previews").font(.headline)
             if model.previewEvents.isEmpty {
-                Text("No lock previews yet. After saving a setting, return nearby to rearm, then try another walk.")
+                Text("No action previews yet. After saving a setting, return nearby to rearm, then try another walk.")
                     .foregroundStyle(.secondary)
             }
             ForEach(model.previewEvents.prefix(5)) { event in
                 HStack(alignment: .top) {
-                    Image(systemName: "lock.fill").foregroundStyle(.orange)
+                    Image(systemName: model.departureAction == .lockScreen ? "lock.fill" : "sparkles.rectangle.stack").foregroundStyle(.orange)
                     Text(event.message)
                     Spacer()
                     Text(event.date, style: .time).monospacedDigit().foregroundStyle(.secondary)

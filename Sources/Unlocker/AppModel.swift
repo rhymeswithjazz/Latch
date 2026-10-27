@@ -30,7 +30,7 @@ final class AppModel {
     private(set) var paused = false
     private(set) var scanning = false
     private(set) var observationTime = ProcessInfo.processInfo.systemUptime
-    private(set) var lastEvent = "No lock events yet"
+    private(set) var lastEvent = "No events yet"
     private(set) var loginEnabled = SMAppService.mainApp.status == .enabled
     var threshold = -75.0
     var weakDelay = 5.0
@@ -39,6 +39,7 @@ final class AppModel {
     private let bluetooth = BluetoothMonitor()
     private let session = SessionMonitor()
     private let locker = ScreenLock()
+    private let screenSaver = ScreenSaver()
     private var store: LocalStore?
     private var canSave = true
     private var timer: Timer?
@@ -98,7 +99,7 @@ final class AppModel {
         weakDelay = next.settings.weakSignalDelay
         missingDelay = next.settings.missingSignalDelay
         passive = next.settings.passive
-        monitor.configure(settings: next.settings, selected: true, lockAvailable: locker.isAvailable)
+        monitor.configure(settings: next.settings, selected: true, lockAvailable: actionAvailable, departureAction: departureAction)
         previewEvents = []
         calibrationSaved = true
         record("calibrationApplied", ["threshold": String(threshold)])
@@ -117,13 +118,43 @@ final class AppModel {
 
     var automaticLocking: Bool { configuration.automaticLocking }
     var canEnableAutomaticLocking: Bool {
-        canSelect && selectedID != nil && locker.isAvailable && !calibration.isRecording &&
+        canSelect && selectedID != nil && actionAvailable && !calibration.isRecording &&
             monitor.session == .unlocked && !paused && monitor.state != .verifyingLock
+    }
+    var departureAction: DepartureAction { configuration.departureAction }
+    private var actionAvailable: Bool {
+        departureAction == .lockScreen ? locker.isAvailable : screenSaver.isAvailable
+    }
+    var actionVerb: String { departureAction == .lockScreen ? "lock" : "start the screen saver" }
+    var automaticModeTitle: String {
+        departureAction == .lockScreen ? "Automatic locking" : "Automatic screen saver"
+    }
+    var automaticToggleTitle: String {
+        departureAction == .lockScreen ? "Automatically lock when I walk away" : "Start screen saver when I walk away"
+    }
+    var manualActionTitle: String {
+        departureAction == .lockScreen ? "Lock Now" : "Start Screen Saver Now"
+    }
+    var canChangeDepartureAction: Bool {
+        canSelect && monitor.state != .verifyingLock && !calibration.isRecording
     }
     var modeDescription: String {
         automaticLocking
-            ? "Automatic locking is on. Latch locks after \(Int(configuration.settings.weakSignalDelay)) seconds of weak signal or \(Int(configuration.settings.missingSignalDelay)) seconds without a signal."
-            : "Preview mode. Latch shows when it would lock. Turn on automatic locking when you are ready."
+            ? "\(automaticModeTitle) is on. Latch will \(actionVerb) after \(Int(configuration.settings.weakSignalDelay)) seconds of weak signal or \(Int(configuration.settings.missingSignalDelay)) seconds without a signal."
+            : "Preview mode. Latch shows when it would \(actionVerb). Turn on the walk-away action when you are ready."
+    }
+
+    func setDepartureAction(_ action: DepartureAction) {
+        guard canChangeDepartureAction, action != departureAction else { return }
+        var next = configuration
+        next.departureAction = action
+        guard save(next) else { return }
+        interruptCalibration("Walk-away action changed. Start a new calibration.")
+        monitor.configure(settings: next.settings, selected: selectedID != nil,
+                          lockAvailable: actionAvailable, departureAction: action)
+        previewEvents = []
+        record("departureActionChanged", ["action": action.rawValue])
+        tick()
     }
 
     func setAutomaticLocking(_ enabled: Bool) {
@@ -139,7 +170,7 @@ final class AppModel {
 
     var selectedName: String { configuration.deviceName ?? "No Watch selected" }
     var selectedID: UUID? { configuration.deviceID }
-    var canLock: Bool { locker.isAvailable && monitor.session == .unlocked && monitor.state != .verifyingLock && !calibration.isRecording }
+    var canLock: Bool { actionAvailable && monitor.session == .unlocked && monitor.state != .verifyingLock && !calibration.isRecording }
     var canSelect: Bool { canSave && store != nil }
     var signal: String {
         guard let rssi = monitor.smoothedRSSI else { return "No valid signal" }
@@ -148,12 +179,12 @@ final class AppModel {
     var status: String {
         switch monitor.state {
         case .waitingForNearby: return selectedID == nil ? "Select your Watch" : "Waiting for a nearby reading"
-        case .armed: return automaticLocking ? "Automatic locking armed" : "Observing proximity"
+        case .armed: return automaticLocking ? "\(automaticModeTitle) armed" : "Observing proximity"
         case .weakSignal: return "Weak signal. Timing departure…"
         case .paused: return "Monitoring paused"
-        case .suspended: return "Monitoring suspended: \(monitor.session.rawValue)"
-        case .verifyingLock: return "Waiting for lock confirmation"
-        case .proposedLock(let reason): return "Would lock: \(reason == .weakSignal ? "weak signal" : "signal lost")"
+        case .suspended: return monitor.session == .screenSaver ? "Monitoring suspended: screen saver running" : "Monitoring suspended: \(monitor.session.rawValue)"
+        case .verifyingLock: return departureAction == .lockScreen ? "Waiting for lock confirmation" : "Waiting for screen saver confirmation"
+        case .proposedLock(let reason): return "Would \(actionVerb): \(reason == .weakSignal ? "weak signal" : "signal lost")"
         case .fault(let message): return message
         }
     }
@@ -172,7 +203,7 @@ final class AppModel {
         weakDelay = configuration.settings.weakSignalDelay
         missingDelay = configuration.settings.missingSignalDelay
         passive = configuration.settings.passive
-        monitor.configure(settings: configuration.settings, selected: selectedID != nil, lockAvailable: locker.isAvailable)
+        monitor.configure(settings: configuration.settings, selected: selectedID != nil, lockAvailable: actionAvailable, departureAction: departureAction)
         monitor.setAutomaticLocking(configuration.automaticLocking)
         _ = monitor.updateSession(session.current())
         bluetooth.onDevices = { [weak self] in self?.devices = $0 }
@@ -181,7 +212,7 @@ final class AppModel {
         bluetooth.onSample = { [weak self] id, rssi, time in self?.receive(id: id, rssi: rssi, time: time) }
         session.onChange = { [weak self] in self?.sessionChanged($0) }
         record("launch", ["mode": automaticLocking ? "automaticLocking" : "preview", "lockFunctionAvailable": String(locker.isAvailable),
-                          "deviceID": selectedID?.uuidString ?? "none", "os": ProcessInfo.processInfo.operatingSystemVersionString])
+                          "departureAction": departureAction.rawValue, "deviceID": selectedID?.uuidString ?? "none", "os": ProcessInfo.processInfo.operatingSystemVersionString])
         bluetooth.select(selectedID, passive: passive)
         tick()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -205,7 +236,7 @@ final class AppModel {
         interruptCalibration("The selected Watch changed. Start a new calibration.")
         history = []; previewEvents = []; lastHistorySample = nil
         rawRSSI = nil
-        monitor.configure(settings: next.settings, selected: true, lockAvailable: locker.isAvailable)
+        monitor.configure(settings: next.settings, selected: true, lockAvailable: actionAvailable, departureAction: departureAction)
         bluetooth.select(device.id, passive: next.settings.passive)
         record("selected", ["deviceID": device.id.uuidString, "name": device.name])
         tick()
@@ -226,7 +257,7 @@ final class AppModel {
         guard next.settings.isValid else { error = "Choose a signal level between -100 and -20 dBm."; return }
         guard save(next) else { return }
         interruptCalibration("Signal level changed.")
-        monitor.configure(settings: next.settings, selected: true, lockAvailable: locker.isAvailable)
+        monitor.configure(settings: next.settings, selected: true, lockAvailable: actionAvailable, departureAction: departureAction)
         previewEvents = []
         record("signalLevelChanged", ["threshold": String(threshold)])
         tick()
@@ -239,7 +270,7 @@ final class AppModel {
         guard next.settings.isValid else { error = "Enter valid thresholds and delays."; return }
         guard save(next) else { return }
         interruptCalibration("Settings changed. Start a new calibration to use these settings.")
-        monitor.configure(settings: next.settings, selected: selectedID != nil, lockAvailable: locker.isAvailable)
+        monitor.configure(settings: next.settings, selected: selectedID != nil, lockAvailable: actionAvailable, departureAction: departureAction)
         bluetooth.select(selectedID, passive: passive)
         record("settings", ["threshold": String(next.settings.threshold), "weakDelay": String(weakDelay),
                             "missingDelay": String(missingDelay), "passive": String(passive)])
@@ -314,7 +345,7 @@ final class AppModel {
 
     private func sessionChanged(_ value: SessionState) {
         guard value != monitor.session else { return }
-        if value != .unlocked { interruptCalibration("Calibration stopped because the Mac locked, slept, or changed session. Return to your desk to restart.") }
+        if value != .unlocked { interruptCalibration("Calibration stopped because the screen saver started or the Mac locked, slept, or changed session. Return to your desk to restart.") }
         historySegment += 1
         process(monitor.updateSession(value))
         rawRSSI = nil
@@ -352,21 +383,30 @@ final class AppModel {
         for effect in effects {
             switch effect {
             case .proposeLock(let reason):
-                let message = reason == .weakSignal ? "Would lock: Watch stayed beyond the signal threshold" : "Would lock: Watch signal was lost"
+                let message = reason == .weakSignal ? "Would \(actionVerb): Watch stayed beyond the signal threshold" : "Would \(actionVerb): Watch signal was lost"
                 lastEvent = message
                 previewEvents.insert(.init(date: Date(), message: message), at: 0)
                 if previewEvents.count > 20 { previewEvents.removeLast() }
-                record("wouldLock", ["reason": reason.rawValue])
+                record("wouldLock", ["reason": reason.rawValue, "action": departureAction.rawValue])
             case .requestLock(let reason):
-                lastEvent = "Lock requested: \(reason.rawValue)"
-                record("lockRequested", ["reason": reason.rawValue])
-                if !locker.lock() { process(monitor.lockInvocationFailed()) }
+                lastEvent = "\(manualActionTitle) requested: \(reason.rawValue)"
+                record("lockRequested", ["reason": reason.rawValue, "action": departureAction.rawValue])
+                switch departureAction {
+                case .lockScreen:
+                    if !locker.lock() { process(monitor.lockInvocationFailed()) }
+                case .startScreenSaver:
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        do { try await screenSaver.start() }
+                        catch { process(monitor.lockInvocationFailed()) }
+                    }
+                }
             case .lockConfirmed:
-                lastEvent = "Mac lock confirmed"
-                record("lockConfirmed")
+                lastEvent = departureAction == .lockScreen ? "Mac lock confirmed" : "Screen saver started"
+                record("lockConfirmed", ["action": departureAction.rawValue])
             case .lockFailed:
-                lastEvent = "Lock failed"
-                record("lockFailed")
+                lastEvent = departureAction == .lockScreen ? "Lock failed" : "Screen saver failed to start"
+                record("lockFailed", ["action": departureAction.rawValue])
             }
         }
     }

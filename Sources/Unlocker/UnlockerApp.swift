@@ -1,6 +1,7 @@
 import AppKit
 import Observation
 import SwiftUI
+import UnlockerCore
 import UnlockerPlatform
 
 @MainActor
@@ -85,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        for title in [model.automaticLocking ? "Latch · Automatic locking on" : "Latch · Preview mode", model.status, "\(model.selectedName) · \(model.signal)"] {
+        for title in [model.automaticLocking ? "Latch · \(model.automaticModeTitle) on" : "Latch · Preview mode", model.status, "\(model.selectedName) · \(model.signal)"] {
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
@@ -93,8 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         addItem("Settings…", action: #selector(showSettings), to: menu)
         addItem(model.paused ? "Resume Monitoring" : "Pause Monitoring", action: #selector(togglePaused), to: menu)
-        addItem(model.automaticLocking ? "Turn Off Automatic Locking" : "Turn On Automatic Locking", action: #selector(toggleAutomaticLocking), enabled: model.automaticLocking || model.canEnableAutomaticLocking, to: menu)
-        addItem("Lock Now", action: #selector(lockNow), enabled: model.canLock, to: menu)
+        addItem(model.automaticLocking ? "Turn Off \(model.automaticModeTitle)" : "Turn On \(model.automaticModeTitle)", action: #selector(toggleAutomaticLocking), enabled: model.automaticLocking || model.canEnableAutomaticLocking, to: menu)
+        addItem(model.manualActionTitle, action: #selector(lockNow), enabled: model.canLock, to: menu)
         menu.addItem(.separator())
         addItem("Check for Updates…", action: #selector(checkForUpdates), enabled: updater.canCheckForUpdates, to: menu)
         addItem("Reveal Diagnostic Logs", action: #selector(revealLogs), to: menu)
@@ -153,7 +154,16 @@ private struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Automatically lock when I walk away", isOn: Binding(get: { model.automaticLocking }, set: { model.setAutomaticLocking($0) }))
+                        Picker("When I walk away", selection: Binding(get: { model.departureAction }, set: { model.setDepartureAction($0) })) {
+                            Text("Lock Screen").tag(DepartureAction.lockScreen)
+                            Text("Start Screen Saver").tag(DepartureAction.startScreenSaver)
+                        }
+                        .disabled(!model.canChangeDepartureAction)
+                        if model.departureAction == .startScreenSaver {
+                            Text("Uses your macOS screen saver. Your Lock Screen settings control when a password is required.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Toggle(model.automaticToggleTitle, isOn: Binding(get: { model.automaticLocking }, set: { model.setAutomaticLocking($0) }))
                             .disabled(!model.automaticLocking && !model.canEnableAutomaticLocking)
                         Text(model.status).font(.headline)
                         Text("\(model.selectedName) · \(model.signal)")
@@ -230,8 +240,8 @@ private struct SettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Save advanced settings") { model.applySettings() }.disabled(!model.canSelect)
                     Divider()
-                    Button("Lock Now") { model.lockNow() }.disabled(!model.canLock)
-                    Text("Lock Now immediately locks this Mac. The guided test only previews locking.").font(.caption).foregroundStyle(.secondary)
+                    Button(model.manualActionTitle) { model.lockNow() }.disabled(!model.canLock)
+                    Text("This runs the selected action now. The guided test only previews it.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Divider()

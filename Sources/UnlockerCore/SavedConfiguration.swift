@@ -1,7 +1,12 @@
 import Foundation
 
+public enum DepartureAction: String, Codable, CaseIterable, Sendable {
+    case lockScreen, startScreenSaver
+}
+
 public struct SavedConfiguration: Codable, Equatable, Sendable {
     public var automaticLocking = false
+    public var departureAction: DepartureAction = .lockScreen
     public var version = 1
     public var deviceID: UUID?
     public var deviceName: String?
@@ -14,7 +19,7 @@ public struct SavedConfiguration: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, deviceID, deviceName, settings, automaticLocking
+        case version, deviceID, deviceName, settings, automaticLocking, departureAction
     }
 
     public init(from decoder: Decoder) throws {
@@ -24,6 +29,7 @@ public struct SavedConfiguration: Codable, Equatable, Sendable {
         deviceName = try values.decodeIfPresent(String.self, forKey: .deviceName)
         settings = try values.decode(MonitorSettings.self, forKey: .settings)
         automaticLocking = try values.decodeIfPresent(Bool.self, forKey: .automaticLocking) ?? false
+        departureAction = try values.decodeIfPresent(DepartureAction.self, forKey: .departureAction) ?? .lockScreen
     }
 
     public static func decode(_ data: Data) throws -> SavedConfiguration {

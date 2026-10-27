@@ -39,6 +39,7 @@ public protocol SessionReading {
 public final class SessionMonitor: SessionReading {
     private var sleeping = false
     private var inactive = false
+    private var screenSaverRunning = false
     public var onChange: ((SessionState) -> Void)?
     private var observers: [NSObjectProtocol] = []
 
@@ -61,13 +62,21 @@ public final class SessionMonitor: SessionReading {
                 }
             })
         }
-        for name in ["com.apple.screenIsLocked", "com.apple.screenIsUnlocked"] {
+        // Screen saver notifications are also undocumented macOS behavior.
+        for name in ["com.apple.screenIsLocked", "com.apple.screenIsUnlocked",
+                     "com.apple.screensaver.didstart", "com.apple.screensaver.didstop"] {
             observers.append(DistributedNotificationCenter.default().addObserver(
                 forName: Notification.Name(name), object: nil, queue: .main
-            ) { [weak self] _ in
+            ) { [weak self] notification in
+                let name = notification.name.rawValue
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.onChange?(self.current())
+                    if name == "com.apple.screensaver.didstart" { self.screenSaverRunning = true }
+                    if name == "com.apple.screensaver.didstop" || name == "com.apple.screenIsUnlocked" {
+                        self.screenSaverRunning = false
+                    }
+                    // A password requirement can make current() report locked before didstart arrives.
+                    self.onChange?(name == "com.apple.screensaver.didstart" ? .screenSaver : self.current())
                 }
             })
         }
@@ -76,15 +85,16 @@ public final class SessionMonitor: SessionReading {
     public func current() -> SessionState {
         if sleeping { return .asleep }
         if inactive { return .inactive }
-        return Self.decode(CGSessionCopyCurrentDictionary() as? [String: Any])
+        return Self.decode(CGSessionCopyCurrentDictionary() as? [String: Any], screenSaverRunning: screenSaverRunning)
     }
 
-    public static func decode(_ dictionary: [String: Any]?) -> SessionState {
+    public static func decode(_ dictionary: [String: Any]?, screenSaverRunning: Bool = false) -> SessionState {
         guard let dictionary else { return .unknown }
         // This lock key and the distributed notifications are undocumented macOS behavior.
         if dictionary["CGSSessionScreenIsLocked"] as? Bool == true { return .locked }
         guard dictionary[kCGSessionOnConsoleKey as String] as? Bool == true else { return .inactive }
         guard dictionary[kCGSessionLoginDoneKey as String] as? Bool == true else { return .unknown }
+        if screenSaverRunning { return .screenSaver }
         return .unlocked
     }
 }

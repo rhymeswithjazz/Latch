@@ -22,7 +22,7 @@ public struct MonitorSettings: Codable, Equatable, Sendable {
 }
 
 public enum SessionState: String, Sendable {
-    case unlocked, locked, asleep, inactive, unknown
+    case unlocked, locked, screenSaver, asleep, inactive, unknown
 }
 
 public enum LockReason: String, Codable, Sendable {
@@ -50,6 +50,7 @@ public struct ProximityMonitor: Sendable {
     public private(set) var session: SessionState = .unknown
     public private(set) var settings: MonitorSettings
     public private(set) var diagnosticOnly: Bool
+    public private(set) var departureAction: DepartureAction = .lockScreen
     private var samples: [(time: TimeInterval, rssi: Double)] = []
     private var armed = false
     private var paused = false
@@ -65,10 +66,12 @@ public struct ProximityMonitor: Sendable {
         self.diagnosticOnly = diagnosticOnly
     }
 
-    public mutating func configure(settings: MonitorSettings, selected: Bool, lockAvailable: Bool) {
+    public mutating func configure(settings: MonitorSettings, selected: Bool, lockAvailable: Bool,
+                                   departureAction: DepartureAction = .lockScreen) {
         self.settings = settings
         self.selected = selected
         available = lockAvailable
+        self.departureAction = departureAction
         resetReadings()
         failure = nil
         refreshState()
@@ -88,7 +91,8 @@ public struct ProximityMonitor: Sendable {
 
     public mutating func updateSession(_ value: SessionState) -> [MonitorEffect] {
         guard value != session else { return [] }
-        let confirmed = value == .locked && pendingLockAt != nil
+        let expectedSession: SessionState = departureAction == .lockScreen ? .locked : .screenSaver
+        let confirmed = pendingLockAt != nil && value == expectedSession
         session = value
         resetReadings()
         if confirmed { pendingLockAt = nil }
@@ -121,9 +125,12 @@ public struct ProximityMonitor: Sendable {
     }
 
     public mutating func tick(at now: TimeInterval) -> [MonitorEffect] {
-        if let requested = pendingLockAt, now - requested >= 3 {
+        let confirmationDelay: TimeInterval = departureAction == .lockScreen ? 3 : 10
+        if let requested = pendingLockAt, now - requested >= confirmationDelay {
             pendingLockAt = nil
-            failure = "Lock was not confirmed. Check the Mac, then retry Lock Now."
+            failure = departureAction == .lockScreen
+                ? "Lock was not confirmed. Check the Mac, then retry Lock Now."
+                : "Screen saver start was not confirmed. Retry Start Screen Saver Now."
             refreshState()
             return [.lockFailed]
         }
@@ -153,8 +160,11 @@ public struct ProximityMonitor: Sendable {
     }
 
     public mutating func lockInvocationFailed() -> [MonitorEffect] {
+        guard pendingLockAt != nil else { return [] }
         pendingLockAt = nil
-        failure = "The macOS lock function failed. Monitoring is stopped."
+        failure = departureAction == .lockScreen
+            ? "The macOS lock function failed. Monitoring is stopped."
+            : "The screen saver could not start. Monitoring is stopped."
         refreshState()
         return [.lockFailed]
     }
@@ -188,7 +198,10 @@ public struct ProximityMonitor: Sendable {
     private mutating func refreshState() {
         if let failure { state = .fault(failure) }
         else if pendingLockAt != nil { state = .verifyingLock }
-        else if !available { state = .fault("The macOS lock function is unavailable.") }
+        else if !available {
+            state = .fault(departureAction == .lockScreen
+                ? "The macOS lock function is unavailable." : "The macOS screen saver is unavailable.")
+        }
         else if !settings.isValid { state = .fault("Invalid monitoring settings.") }
         else if paused { state = .paused }
         else if session != .unlocked { state = .suspended }
