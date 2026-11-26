@@ -36,7 +36,7 @@ Preflight checks the Developer ID identity, update key, notarization credentials
 
 Use `MAJOR.MINOR.PATCH` for the public version. While Latch is before 1.0, bump the minor number for new features and the patch number for fixes. Reset the patch to zero when the minor changes. Reserve 1.0.0 for the first release we consider ready for everyday use. After 1.0, bump the major number for breaking changes, the minor for compatible features, and the patch for fixes.
 
-The screen saver release is **0.3.0, build 10**. Keep `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` in sync with each release. Pass the same values to the packaging command.
+The Finder icon fix is **0.3.1, build 11**. Keep `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` in sync with each release. Pass the same values to the packaging command.
 
 Build numbers are separate, increasing integers shared by stable and beta releases. Choose a number above every existing release, draft, tag, and packaged build. Never reuse a build number or overwrite a release artifact. Keep `personal-BUILD` tags for compatibility with the update feed; GitHub release titles and the app show the public version. Beta packages use `--beta` and Sparkle's beta channel, with their own build numbers.
 

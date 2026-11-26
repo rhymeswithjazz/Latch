@@ -12,7 +12,7 @@ The tagline describes the intended finished product. Current builds remain diagn
 - `Resources/Latch.icns`: macOS icon containing standard and Retina sizes.
 - The menu bar mark is a separate native vector drawing. It uses a solid latch during observation and an outline while paused.
 
-Run `python3 scripts/package_icon.py` to rebuild the icon bundle. The generated master is kept unchanged; packaging only scales copies for macOS icon sizes. The ICNS container follows HighDock's PNG-chunk packaging approach.
+Run `python3 scripts/package_icon.py` on macOS to rebuild the icon bundle. The script uses `tiff2icns` to encode the small standard icons with their alpha masks and embeds PNGs for the large standard and Retina sizes.
 
 ## Generation
 
